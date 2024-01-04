@@ -157,30 +157,61 @@ void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev,
     double laneWidth = 4.0; // assumed width of the ego lane
 
     // find closest distance to Lidar points within ego lane
-    double minXPrev, minXCurr ;
+    vector<double> lidarXPrev, lidarXCurr;
+    double minXPrev, minXCurr;
+    double meanPrev, meanCurr;
     double sumPrev, sumCurr;
     int countPrev = 0, countCurr = 0;
+    double sigmaOnePrev, sigmaOneCurr;
 
-    for (auto it = lidarPointsPrev.begin(); it != lidarPointsPrev.end(); ++it)
+    for (auto it : lidarPointsPrev)
     {
-        if(abs(it->y) <= laneWidth/2.0){
+        if(abs(it.y) <= laneWidth/2.0){
             // minXPrev = minXPrev > it->x ? it->x : minXPrev;
-            sumPrev += it->x;
+            lidarXPrev.push_back(it.x);
+            sumPrev += it.x;
             countPrev++;
         }
     }
 
-    for (auto it = lidarPointsCurr.begin(); it != lidarPointsCurr.end(); ++it)
+    for (auto it : lidarPointsCurr)
     {
-        if(abs(it->y) <= laneWidth/2.0){
+        if(abs(it.y) <= laneWidth/2.0){
             // minXCurr = minXCurr > it->x ? it->x : minXCurr;
-            sumCurr += it->x;
+            lidarXCurr.push_back(it.x);
+            sumCurr += it.x;
             countCurr++;
         }
     }
 
-    minXPrev = sumPrev / countPrev;
-    minXCurr = sumCurr / countCurr;
+    meanPrev = sumPrev / countPrev;
+    meanCurr = sumCurr / countCurr;
+
+    countPrev = 0;
+    countCurr = 0;
+
+    for (auto xP : lidarXPrev)
+        sigmaOnePrev += (lidarXPrev[xP] - sumPrev) * (lidarXPrev[xP] - sumPrev);
+
+    for (auto xP : lidarXCurr)
+        sigmaOneCurr += (lidarXCurr[xP] - sumCurr) * (lidarXCurr[xP] - sumCurr);
+
+    double sdPrev = sqrt(sigmaOnePrev / lidarXPrev.size() - 1);
+    double sdCurr = sqrt(sigmaOneCurr / lidarXCurr.size() - 1);
+
+    for (int i = 0; i < lidarXPrev.size(); i++){
+        if(abs(lidarXPrev[i] - meanPrev) < (3*sdPrev)){
+            minXPrev += lidarXPrev[i];
+            countPrev++;
+        }
+    }
+
+    for (int i = 0; i < lidarXCurr.size(); i++){
+        if(abs(lidarXCurr[i] - meanCurr) < (3*sdCurr)){
+            minXCurr += lidarXCurr[i];
+            countCurr++;
+        }
+    }
 
     // compute TTC from both measurements
     TTC = minXCurr * dT / (minXPrev - minXCurr);
